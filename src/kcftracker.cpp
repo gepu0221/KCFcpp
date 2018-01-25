@@ -262,6 +262,7 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
 {
     using namespace FFTTools;
 
+    ////傅里叶变换做滤波
     cv::Mat k = gaussianCorrelation(x, x);
     cv::Mat alphaf = complexDivision(_prob, (fftd(k) + lambda));
     

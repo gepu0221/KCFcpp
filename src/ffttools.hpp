@@ -174,6 +174,7 @@ cv::Mat complexDivision(cv::Mat a, cv::Mat b)
     cv::split(a, pa);
     cv::split(b, pb);
 
+    //cv::Mat A.mul(cv::Mat B)=A*B
     cv::Mat divisor = 1. / (pb[0].mul(pb[0]) + pb[1].mul(pb[1]));
 
     std::vector<cv::Mat> pres;
@@ -182,6 +183,7 @@ cv::Mat complexDivision(cv::Mat a, cv::Mat b)
     pres.push_back((pa[1].mul(pb[0]) + pa[0].mul(pb[1])).mul(divisor));
 
     cv::Mat res;
+    //多通道合并
     cv::merge(pres, res);
     return res;
 }

@@ -297,6 +297,7 @@ cv::Mat KCFTracker::gaussianCorrelation(cv::Mat x1, cv::Mat x2)
             x1aux = x1.row(i);   // Procedure do deal with cv::Mat multichannel bug
             x1aux = x1aux.reshape(1, size_patch[0]);
             x2aux = x2.row(i).reshape(1, size_patch[0]);
+            //MulSpectrums是对于两张频谱图中的每个元素的乘法
             cv::mulSpectrums(fftd(x1aux), fftd(x2aux), caux, 0, true); 
             caux = fftd(caux, true);
             rearrange(caux);
@@ -335,6 +336,8 @@ cv::Mat KCFTracker::createGaussianPeak(int sizey, int sizex)
         {
             int ih = i - syh;
             int jh = j - sxh;
+            //ih * ih + jh * jh距离中心点的距离平方
+            //res是一个与patch中每个像素点的距离平方exp相关的矩阵
             res(i, j) = std::exp(mult * (float) (ih * ih + jh * jh));
         }
     return FFTTools::fftd(res);

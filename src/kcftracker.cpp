@@ -163,6 +163,7 @@ void KCFTracker::init(const cv::Rect &roi, cv::Mat image)
     _roi = roi;
     assert(roi.width >= 0 && roi.height >= 0);
     _tmpl = getFeatures(image, 1);
+    // feature map:size_patch[0]:width,size_patch[1]:height,size_patch[2]:channel
     _prob = createGaussianPeak(size_patch[0], size_patch[1]);
     _alphaf = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
     //_num = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));

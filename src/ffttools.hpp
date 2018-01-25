@@ -167,8 +167,10 @@ cv::Mat complexMultiplication(cv::Mat a, cv::Mat b)
 
 cv::Mat complexDivision(cv::Mat a, cv::Mat b)
 {
+    //定义Mat容器pa，pb用于保存拆分后的数据
     std::vector<cv::Mat> pa;
     std::vector<cv::Mat> pb;
+    //拆分矩阵放入vector<cv::Mat>中
     cv::split(a, pa);
     cv::split(b, pb);
 

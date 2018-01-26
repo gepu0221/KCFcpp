@@ -164,20 +164,24 @@ void KCFTracker::init(const cv::Rect &roi, cv::Mat image)
     assert(roi.width >= 0 && roi.height >= 0);
     _tmpl = getFeatures(image, 1);
     // feature map:size_patch[0]:width,size_patch[1]:height,size_patch[2]:channel
+    //y：按照距离正样本的远近标记距离，越近可能性越大
     _prob = createGaussianPeak(size_patch[0], size_patch[1]);
     _alphaf = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
     //_num = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
     //_den = cv::Mat(size_patch[0], size_patch[1], CV_32FC2, float(0));
+    //train_interp_factor=1,全部使用x模板
     train(_tmpl, 1.0); // train with initial frame
  }
 // Update position based on the new frame
 cv::Rect KCFTracker::update(cv::Mat image)
 {
+    //越界处理
     if (_roi.x + _roi.width <= 0) _roi.x = -_roi.width + 1;
     if (_roi.y + _roi.height <= 0) _roi.y = -_roi.height + 1;
     if (_roi.x >= image.cols - 1) _roi.x = image.cols - 2;
     if (_roi.y >= image.rows - 1) _roi.y = image.rows - 2;
 
+    //提取当前矩形框的中心(cx,cy)
     float cx = _roi.x + _roi.width / 2.0f;
     float cy = _roi.y + _roi.height / 2.0f;
 
@@ -218,7 +222,7 @@ cv::Rect KCFTracker::update(cv::Mat image)
     if (_roi.y >= image.rows - 1) _roi.y = image.rows - 1;
     if (_roi.x + _roi.width <= 0) _roi.x = -_roi.width + 2;
     if (_roi.y + _roi.height <= 0) _roi.y = -_roi.height + 2;
-
+ 
     assert(_roi.width >= 0 && _roi.height >= 0);
     cv::Mat x = getFeatures(image, 0);
     train(x, interp_factor);
@@ -232,16 +236,21 @@ cv::Point2f KCFTracker::detect(cv::Mat z, cv::Mat x, float &peak_value)
 {
     using namespace FFTTools;
 
+    //将当前帧x和模板帧z在傅里叶域运算，得到高斯相关矩阵K
     cv::Mat k = gaussianCorrelation(x, z);
+    //a(res)=Fdiag(K+lamda)^(-1)F^H y
     cv::Mat res = (real(fftd(complexMultiplication(_alphaf, fftd(k)), true)));
 
     //minMaxLoc only accepts doubles for the peak, and integer points for the coordinates
     cv::Point2i pi;
     double pv;
+    //void minMaxLoc( const Mat& src,double* minVal, double* maxVal=0, Point* minLoc=0, Point* maxLoc=0, const Mat& mask=Mat() ); 
+    //cv::minMaxLoc获得矩阵中最大值和最小值的位置和相应值，此处只用于搜索最大值，不需要的设置为NULL
     cv::minMaxLoc(res, NULL, &pv, NULL, &pi);
     peak_value = (float) pv;
 
     //subpixel peak estimation, coordinates will be non-integer
+    //用最大值像素点pi位置周围的值和最大值修正pi的位置
     cv::Point2f p((float)pi.x, (float)pi.y);
 
     if (pi.x > 0 && pi.x < res.cols-1) {
@@ -263,8 +272,9 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
 {
     using namespace FFTTools;
 
-    ////傅里叶变换做滤波
+    ////傅里叶域做点乘
     cv::Mat k = gaussianCorrelation(x, x);
+    //分通道矩阵求逆
     cv::Mat alphaf = complexDivision(_prob, (fftd(k) + lambda));
     
     _tmpl = (1 - train_interp_factor) * _tmpl + (train_interp_factor) * x;
@@ -283,6 +293,7 @@ void KCFTracker::train(cv::Mat x, float train_interp_factor)
 
 }
 
+//求高斯核K
 // Evaluates a Gaussian kernel with bandwidth SIGMA for all relative shifts between input images X and Y, which must both be MxN. They must    also be periodic (ie., pre-processed with a cosine window).
 cv::Mat KCFTracker::gaussianCorrelation(cv::Mat x1, cv::Mat x2)
 {
@@ -293,6 +304,7 @@ cv::Mat KCFTracker::gaussianCorrelation(cv::Mat x1, cv::Mat x2)
         cv::Mat caux;
         cv::Mat x1aux;
         cv::Mat x2aux;
+        //模板帧和当前帧在傅里叶域，分通道做点积求和（对应公式(1)中的3部分）
         for (int i = 0; i < size_patch[2]; i++) {
             x1aux = x1.row(i);   // Procedure do deal with cv::Mat multichannel bug
             x1aux = x1aux.reshape(1, size_patch[0]);
@@ -313,9 +325,12 @@ cv::Mat KCFTracker::gaussianCorrelation(cv::Mat x1, cv::Mat x2)
         c = real(c);
     }
     cv::Mat d; 
+    //cv::sum(m)：对矩阵m多通道求和
+    //cv::sum(x1.mul(x1))[0]：对应公式（1）中的1部分
     cv::max(( (cv::sum(x1.mul(x1))[0] + cv::sum(x2.mul(x2))[0])- 2. * c) / (size_patch[0]*size_patch[1]*size_patch[2]) , 0, d);
 
     cv::Mat k;
+    //k=exp(-d/(sigma*sigma))
     cv::exp((-d / (sigma * sigma)), k);
     return k;
 }
@@ -410,6 +425,8 @@ cv::Mat KCFTracker::getFeatures(const cv::Mat & image, bool inithann, float scal
     if (_hogfeatures) {
         IplImage z_ipl = z;
         CvLSVMFeatureMapCaskade *map;
+        //cell:Hog特征划分若干的区域，然后对每个区域提取特征，在cell里面提取梯度信息，绘制梯度直方图
+        //将多个cell的方向直方图串在一起形成block
         getFeatureMaps(&z_ipl, cell_size, &map);
         normalizeAndTruncate(map,0.2f);
         PCAFeatureMaps(map);
